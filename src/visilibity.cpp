@@ -1794,7 +1794,7 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
                                     double epsilon) {
   // true  => data printed to terminal
   // false => silent
-  const bool PRINTING_DEBUG_DATA = false;
+  const bool PRINTING_DEBUG_DATA = true;
 
   // For now, just find one shortest path, later change this to a
   // vector to find all shortest paths (w/in epsilon).
@@ -1813,6 +1813,9 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
 
   Visibility_Polygon finish_visibility_polygon(finish, *this, epsilon);
 
+  // Create two arrays of booleans called start_visible and finish_visible. They
+  // are vectors of flags that indicate whether a vertex in the environment is
+  // visible from or visibly by the start and end vertices, respectively.
   // Connect start and finish Points to the visibility graph
   bool *start_visible;  // start row of visibility graph
   bool *finish_visible; // finish row of visibility graph
@@ -1856,12 +1859,27 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
   current_node.parent_search_tree_location = T.begin();
   Q.insert(current_node);
 
+  if (PRINTING_DEBUG_DATA ) {
+    std::cout << std::endl
+              << "=============="
+              << " Start node "
+              << "==============" << std::endl;
+    current_node.print();
+    std::cout << std::endl;
+    std::cout << start << std::endl;
+  }
+  if (PRINTING_DEBUG_DATA ) {
+    std::cout << std::endl
+              << "=============="
+              << " Finish node "
+              << "==============" << std::endl;
+    std::cout << finish << std::endl;
+  }
+
+
   // Initialize temporary variables
-  Shortest_Path_Node child; // children of current_node
-  std::vector<Shortest_Path_Node> children;
   // flags
   bool solution_found = false;
-  bool child_already_visited = false;
   //-----------Begin Main Loop-----------
   while (!Q.empty()) {
 
@@ -1872,7 +1890,7 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
     if (PRINTING_DEBUG_DATA) {
       std::cout << std::endl
                 << "=============="
-                << " current_node just poped off of Q "
+                << " current_node just popped off of Q "
                 << "==============" << std::endl;
       current_node.print();
       std::cout << std::endl;
@@ -1891,7 +1909,9 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
     }
 
     // Expand current_node (compute children)
-    children.clear();
+    // Build up the list of nodes visible from the current node. Call those the
+    // children of the current node.
+    std::vector<Shortest_Path_Node> children;
 
     if (PRINTING_DEBUG_DATA) {
       std::cout << "-------------------------------------------" << std::endl
@@ -1900,11 +1920,12 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
                 << "-------------------------------------------" << std::endl;
     }
 
-    // if current_node corresponds to start
-    if (current_node.vertex_index == n()) {
+    if (current_node.vertex_index ==
+        n()) { // if current_node corresponds to start
       // loop over environment vertices
       for (unsigned i = 0; i < n(); i++) {
         if (start_visible[i]) {
+          Shortest_Path_Node child;
           child.vertex_index = i;
           child.parent_search_tree_location = current_node.search_tree_location;
           child.cost_to_come = distance(start, (*this)(i));
@@ -1914,16 +1935,19 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
           if (PRINTING_DEBUG_DATA) {
             std::cout << std::endl << "computed child: " << std::endl;
             child.print();
+            std::cout << std::endl;
+            std::cout << (*this)(child.vertex_index) << std::endl;
           }
         }
       }
-    }
-    // else current_node corresponds to a vertex of the environment
-    else {
+    } else { // else current_node corresponds to a vertex of the environment
       // check which environment vertices are visible
       for (unsigned i = 0; i < n(); i++) {
-        if (current_node.vertex_index != i)
+        if (current_node.vertex_index != i) {
+          // If the node whose index is i is visible from current_node then the
+          // node whose index is i is a child of current_node.
           if (visibility_graph(current_node.vertex_index, i)) {
+            Shortest_Path_Node child;
             child.vertex_index = i;
             child.parent_search_tree_location =
                 current_node.search_tree_location;
@@ -1938,9 +1962,11 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
               child.print();
             }
           }
+        }
       }
       // check if finish is visible
       if (finish_visible[current_node.vertex_index]) {
+        Shortest_Path_Node child;
         child.vertex_index = n() + 1;
         child.parent_search_tree_location = current_node.search_tree_location;
         child.cost_to_come =
@@ -1964,56 +1990,70 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
     }
 
     // Process children
-    for (std::vector<Shortest_Path_Node>::iterator children_itr =
-             children.begin();
-         children_itr != children.end(); children_itr++) {
-      child_already_visited = false;
-
+    for (std::vector<Shortest_Path_Node>::iterator child_itr = children.begin();
+         child_itr != children.end(); child_itr++) {
       if (PRINTING_DEBUG_DATA) {
         std::cout << std::endl
                   << "current child being processed: " << std::endl;
-        children_itr->print();
+        child_itr->print();
       }
 
-      // Check if child state has already been visited
-      //(by looking in search tree T)
-      for (std::list<Shortest_Path_Node>::iterator T_itr = T.begin();
-           T_itr != T.end(); T_itr++) {
-        if (children_itr->vertex_index == T_itr->vertex_index) {
-          children_itr->search_tree_location = T_itr;
-          child_already_visited = true;
-          break;
-        }
-      }
+      // Check if child state has already been visited (by looking in search tree T)
 
-      if (!child_already_visited) {
-        // Add child to search tree T
-        T.push_back(*children_itr);
+      // for (std::list<Shortest_Path_Node>::iterator T_itr = T.begin();
+      //      T_itr != T.end(); T_itr++) {
+      //   if (child_itr->vertex_index == T_itr->vertex_index) {
+      //     child_itr->search_tree_location = T_itr;
+      //     child_already_visited = true;
+      //     break;
+      //   }
+      // }
+
+      child_itr->search_tree_location =
+          std::find_if(T.begin(), T.end(), [&child_itr](auto current_T) {
+            return child_itr->vertex_index == current_T.vertex_index;
+          });
+      bool child_already_visited = child_itr->search_tree_location != T.end();
+
+      if (!child_already_visited) { // If the current child node of the current
+                                    // node has not been visited yet, add it to
+                                    // the search tree and unconditionally keep
+                                    // its cost_to_come.
+        T.push_back(*child_itr);
         (--T.end())->search_tree_location = --T.end();
-        children_itr->search_tree_location = --T.end();
-        Q.insert(*children_itr);
-      } else if (children_itr->search_tree_location->cost_to_come >
-                 children_itr->cost_to_come) {
+        child_itr->search_tree_location = --T.end();
+        Q.insert(*child_itr);
+      } else if (child_itr->search_tree_location->cost_to_come >
+                 child_itr
+                     ->cost_to_come) { // Otherwise, the current child node of
+                                       // the current node has been visited.
+                                       // Only update its cost_to_come if the
+                                       // path through current_node is better.
         // redirect parent pointer in search tree
-        children_itr->search_tree_location->parent_search_tree_location =
-            children_itr->parent_search_tree_location;
+        child_itr->search_tree_location->parent_search_tree_location =
+            child_itr->parent_search_tree_location;
         // and update cost data
-        children_itr->search_tree_location->cost_to_come =
-            children_itr->cost_to_come;
-        // update Q
+        child_itr->search_tree_location->cost_to_come = child_itr->cost_to_come;
+
+        // Because we updated its tentative distance from the start, we have to
+        // update child in Q. In order to do that, we have to remove it from Q
+        // and then re-add it.
+
+        // TODO: This can be a lambda.
         for (std::set<Shortest_Path_Node>::iterator Q_itr = Q.begin();
              Q_itr != Q.end(); Q_itr++) {
-          if (children_itr->vertex_index == Q_itr->vertex_index) {
+          if (child_itr->vertex_index == Q_itr->vertex_index) {
             Q.erase(Q_itr);
             break;
           }
         }
-        Q.insert(*children_itr);
+        Q.insert(*child_itr);
       }
 
+      // TODO: This seems redundant.
       // If not already visited, insert into Q
-      if (!child_already_visited)
-        Q.insert(*children_itr);
+      // if (!child_already_visited)
+      //   Q.insert(*child_itr);
 
       if (PRINTING_DEBUG_DATA) {
         std::cout << "child already visited? " << child_already_visited
@@ -3161,4 +3201,121 @@ std::ostream &operator<<(std::ostream &outs,
   return outs;
 }
 
+bool TestSupport::validate_shortest_path_test_setup(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards) {
+  // ASCII escape sequences for colored terminal text.
+  std::string alert("\a");       // Beep
+  std::string normal("\x1b[0m"); // Designated fg color default bg color
+  std::string red("\x1b[31m");
+  std::string red_blink("\x1b[5;31m");
+  std::string black("\E[30;47m");
+  std::string green("\E[32m");
+  std::string yellow("\E[33;40m");
+  std::string blue("\E[34;47m");
+  std::string magenta("\x1b[35m");
+  std::string cyan("\E[36m");
+  std::string white_bold("\E[1;37;40m");
+  std::string clear_display("\E[2J");
+
+  // Check Environment is epsilon-valid
+  std::cout << "Validating environment model . . . ";
+  if (environment.is_valid(epsilon))
+    std::cout << "OK" << std::endl;
+  else {
+    std::cout << std::endl
+              << red << "Warning:  Environment model "
+              << "is invalid." << std::endl
+              << "A valid environment model must have" << std::endl
+              << "   1) outer boundary and holes pairwise "
+              << "epsilon -disjoint simple polygons" << std::endl
+              << "   (no two features should come "
+              << "within epsilon of each other)," << std::endl
+              << "   2) outer boundary is oriented ccw, and" << std::endl
+              << "   3) holes are oriented cw." << std::endl
+              << normal;
+    return false;
+  }
+
+  // For the shortest path calculation tests, there must be two guards, the start
+  // guard and the finish guard.
+  std::cout << "Checking that there are exactly two guards ... ";
+  if (guards.N() != 2)
+    return false;
+  else
+    std::cout << "OK" << std::endl;
+
+  // Check Guards are all in the Environment
+  std::cout << "Checking all guards are "
+            << "in the environment and noncolocated . . . ";
+
+  for (unsigned i = 0; i < guards.N(); i++) {
+    if (!guards[i].in(environment, epsilon)) {
+      std::cout << std::endl
+                << red << "Warning:  guard " << i << " not in the environment."
+                << normal << std::endl;
+      return false;
+    }
+  }
+  if (!guards.noncolocated(epsilon)) {
+    std::cout << std::endl
+              << red << "Warning:  Some guards are colocated." << normal
+              << std::endl;
+    return false;
+  } else
+    std::cout << "OK" << std::endl;
+
+  /*----------Print Data and Statistics to Screen----------*/
+
+  // Environment data
+  std::cout << "The environment model is:" << std::endl;
+  std::cout << magenta << environment << normal;
+
+  // Environment stats
+  std::cout << "This environment has " << cyan << environment.n()
+            << " vertices, " << environment.r() << " reflex vertices, "
+            << environment.h() << " holes, "
+            << "area " << environment.area() << ", "
+            << "boundary length " << environment.boundary_length() << ", "
+            << "diameter " << environment.diameter() << "." << normal
+            << std::endl;
+
+  // Guards data
+  std::cout << "The guards' positions are:" << std::endl;
+  std::cout << magenta << guards << normal;
+
+  // Guards stats
+  std::cout << "There are " << cyan << guards.N() << " guards." << normal
+            << std::endl;
+  return true;
+}
+
+void TestSupport::set_output_precision() {
+  // Set iostream floating-point display format
+  const int IOS_PRECISION = 10;
+  std::cout.setf(std::ios::fixed);
+  std::cout.setf(std::ios::showpoint);
+  std::cout.precision(IOS_PRECISION);
+};
+
+void TestSupport::seed_random() {
+  // Seed the rand() fnc w/Unix time
+  //(only necessary once at the beginning of the program)
+  std::srand(std::time(NULL));
+  rand();
+}
+
+Polyline::Polyline(const std::string &filename) {
+  std::ifstream fin(filename.c_str());
+  assert(!fin.fail());
+
+  Point point_temp;
+  double x_temp, y_temp;
+  while (fin >> x_temp and fin >> y_temp) {
+    point_temp.set_x(x_temp);
+    point_temp.set_y(y_temp);
+    vertices_.push_back(point_temp);
+  }
+  fin.close();
+
+  std::cout << *this << std::endl;
+}
 } // namespace VisiLibity
