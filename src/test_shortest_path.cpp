@@ -59,8 +59,8 @@ int main(int argc, char *argv[])
 {
   assert(argc == 4);
 
-  VisiLibity::TestSupport::set_output_precision();
-  VisiLibity::TestSupport::seed_random();
+  VisiLibity::UnitTest::set_output_precision();
+  VisiLibity::UnitTest::seed_random();
 
   //Set geometric robustness constant
   //:WARNING: 
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 
   /*----------Check Validity of Geometry----------*/
 
-  assert(VisiLibity::TestSupport::validate_shortest_path_test_setup(test_environment, epsilon, test_guards));
+  assert(VisiLibity::ShortestPathTest::validate(test_environment, epsilon, test_guards));
 	 
   //Compute and display visibility polygon
   VisiLibity::Polyline actual_shortest_path = test_environment.shortest_path(test_guards[0], test_guards[1], epsilon);

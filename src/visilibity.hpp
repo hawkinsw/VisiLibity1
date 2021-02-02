@@ -2059,11 +2059,9 @@ std::ostream &operator<<(std::ostream &outs,
                          const Visibility_Graph &visibility_graph);
 
 
-
-class TestSupport {
-  public:
+class UnitTest {
+public:
   static void set_output_precision();
-  static bool validate_shortest_path_test_setup(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards);
   static void seed_random();
 
   template <std::size_t N>
@@ -2075,6 +2073,11 @@ class TestSupport {
   }
   return point_vector;
   }
+};
+
+class ShortestPathTest: public UnitTest {
+public:
+  static bool validate(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards);
 };
 } // namespace VisiLibity
 

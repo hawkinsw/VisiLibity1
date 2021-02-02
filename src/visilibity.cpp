@@ -1794,7 +1794,7 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
                                     double epsilon) {
   // true  => data printed to terminal
   // false => silent
-  const bool PRINTING_DEBUG_DATA = true;
+  const bool PRINTING_DEBUG_DATA = false;
 
   // For now, just find one shortest path, later change this to a
   // vector to find all shortest paths (w/in epsilon).
@@ -3201,7 +3201,10 @@ std::ostream &operator<<(std::ostream &outs,
   return outs;
 }
 
-bool TestSupport::validate_shortest_path_test_setup(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards) {
+bool ShortestPathTest::validate(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards) {
+
+  const bool PRINTING_DEBUG_DATA = true;
+
   // ASCII escape sequences for colored terminal text.
   std::string alert("\a");       // Beep
   std::string normal("\x1b[0m"); // Designated fg color default bg color
@@ -3217,9 +3220,12 @@ bool TestSupport::validate_shortest_path_test_setup(const VisiLibity::Environmen
   std::string clear_display("\E[2J");
 
   // Check Environment is epsilon-valid
-  std::cout << "Validating environment model . . . ";
-  if (environment.is_valid(epsilon))
-    std::cout << "OK" << std::endl;
+  if (PRINTING_DEBUG_DATA)
+    std::cout << "Validating environment model . . . ";
+  if (environment.is_valid(epsilon)) {
+    if (PRINTING_DEBUG_DATA)
+      std::cout << "OK" << std::endl;
+  }
   else {
     std::cout << std::endl
               << red << "Warning:  Environment model "
@@ -3237,15 +3243,18 @@ bool TestSupport::validate_shortest_path_test_setup(const VisiLibity::Environmen
 
   // For the shortest path calculation tests, there must be two guards, the start
   // guard and the finish guard.
-  std::cout << "Checking that there are exactly two guards ... ";
+  if (PRINTING_DEBUG_DATA)
+    std::cout << "Checking that there are exactly two guards ... ";
+
   if (guards.N() != 2)
     return false;
-  else
+  else if (PRINTING_DEBUG_DATA)
     std::cout << "OK" << std::endl;
 
   // Check Guards are all in the Environment
-  std::cout << "Checking all guards are "
-            << "in the environment and noncolocated . . . ";
+  if (PRINTING_DEBUG_DATA)
+    std::cout << "Checking all guards are "
+              << "in the environment and noncolocated . . . ";
 
   for (unsigned i = 0; i < guards.N(); i++) {
     if (!guards[i].in(environment, epsilon)) {
@@ -3260,35 +3269,39 @@ bool TestSupport::validate_shortest_path_test_setup(const VisiLibity::Environmen
               << red << "Warning:  Some guards are colocated." << normal
               << std::endl;
     return false;
-  } else
+  } else if (PRINTING_DEBUG_DATA)
     std::cout << "OK" << std::endl;
 
   /*----------Print Data and Statistics to Screen----------*/
 
   // Environment data
-  std::cout << "The environment model is:" << std::endl;
-  std::cout << magenta << environment << normal;
+  if (PRINTING_DEBUG_DATA) {
+    std::cout << "The environment model is:" << std::endl;
+    std::cout << magenta << environment << normal << std::endl;
+  }
 
   // Environment stats
-  std::cout << "This environment has " << cyan << environment.n()
-            << " vertices, " << environment.r() << " reflex vertices, "
-            << environment.h() << " holes, "
-            << "area " << environment.area() << ", "
-            << "boundary length " << environment.boundary_length() << ", "
-            << "diameter " << environment.diameter() << "." << normal
-            << std::endl;
+  if (PRINTING_DEBUG_DATA) {
+    std::cout << "This environment has " << cyan << environment.n()
+              << " vertices, " << environment.r() << " reflex vertices, "
+              << environment.h() << " holes, "
+              << "area " << environment.area() << ", "
+              << "boundary length " << environment.boundary_length() << ", "
+              << "diameter " << environment.diameter() << "." << normal
+              << std::endl;
 
   // Guards data
-  std::cout << "The guards' positions are:" << std::endl;
-  std::cout << magenta << guards << normal;
+    std::cout << "The guards' positions are:" << std::endl;
+    std::cout << magenta << guards << normal;
 
-  // Guards stats
-  std::cout << "There are " << cyan << guards.N() << " guards." << normal
-            << std::endl;
+    // Guards stats
+    std::cout << "There are " << cyan << guards.N() << " guards." << normal
+              << std::endl;
+  }
   return true;
 }
 
-void TestSupport::set_output_precision() {
+void UnitTest::set_output_precision() {
   // Set iostream floating-point display format
   const int IOS_PRECISION = 10;
   std::cout.setf(std::ios::fixed);
@@ -3296,7 +3309,7 @@ void TestSupport::set_output_precision() {
   std::cout.precision(IOS_PRECISION);
 };
 
-void TestSupport::seed_random() {
+void UnitTest::seed_random() {
   // Seed the rand() fnc w/Unix time
   //(only necessary once at the beginning of the program)
   std::srand(std::time(NULL));
@@ -3314,8 +3327,5 @@ Polyline::Polyline(const std::string &filename) {
     point_temp.set_y(y_temp);
     vertices_.push_back(point_temp);
   }
-  fin.close();
-
-  std::cout << *this << std::endl;
 }
 } // namespace VisiLibity
