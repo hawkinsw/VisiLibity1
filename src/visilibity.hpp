@@ -59,15 +59,15 @@ License along with VisiLibity.  If not, see <http://www.gnu.org/licenses/>.
 #include <vector>
 // integrated keys
 #include <algorithm> //sorting, min, max, reverse
-#include <cassert>   //assertions
-#include <cstdlib>   //rand and srand
-#include <cstring>   //C-string manipulation
-#include <ctime>     //Unix time
-#include <fstream>   //file I/O
+#include <array>
+#include <cassert> //assertions
+#include <cstdlib> //rand and srand
+#include <cstring> //C-string manipulation
+#include <ctime>   //Unix time
+#include <fstream> //file I/O
 #include <iostream>
 #include <list>
 #include <string> //string class
-#include <array>
 
 /// VisiLibity's sole namespace
 namespace VisiLibity {
@@ -985,7 +985,7 @@ public:
   Polyline(const std::vector<Point> &vertices_temp) {
     vertices_ = vertices_temp;
   }
-  /// construct from file 
+  /// construct from file
   Polyline(const std::string &filename);
 
   // Accessors
@@ -1045,7 +1045,9 @@ public:
   void append(const Polyline &polyline);
 
   /// Compare two Polylines
-  bool operator==(const VisiLibity::Polyline &other) { return vertices_ == other.vertices_; }
+  bool operator==(const VisiLibity::Polyline &other) {
+    return vertices_ == other.vertices_;
+  }
 
 private:
   std::vector<Point> vertices_;
@@ -2058,7 +2060,6 @@ private:
 std::ostream &operator<<(std::ostream &outs,
                          const Visibility_Graph &visibility_graph);
 
-
 class UnitTest {
 public:
   static void set_output_precision();
@@ -2066,18 +2067,20 @@ public:
 
   template <std::size_t N>
   static std::vector<Point> make_point_vector(std::array<double, N> vertices) {
-    static_assert(N % 2 == 0, "Specify an even number of points to make a point array.");
+    static_assert(N % 2 == 0,
+                  "Specify an even number of points to make a point array.");
     std::vector<Point> point_vector{};
-    for (size_t i = 0; i<N; i+=2) {
-      point_vector.push_back(Point(vertices[i], vertices[i+1]));
-  }
-  return point_vector;
+    for (size_t i = 0; i < N; i += 2) {
+      point_vector.push_back(Point(vertices[i], vertices[i + 1]));
+    }
+    return point_vector;
   }
 };
 
-class ShortestPathTest: public UnitTest {
+class ShortestPathTest : public UnitTest {
 public:
-  static bool validate(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards);
+  static bool validate(const VisiLibity::Environment &environment,
+                       const double epsilon, const VisiLibity::Guards &guards);
 };
 } // namespace VisiLibity
 

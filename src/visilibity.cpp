@@ -1794,7 +1794,7 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
                                     double epsilon) {
   // true  => data printed to terminal
   // false => silent
-  const bool PRINTING_DEBUG_DATA = false;
+  const bool PRINTING_DEBUG_DATA = true;
 
   // For now, just find one shortest path, later change this to a
   // vector to find all shortest paths (w/in epsilon).
@@ -1859,7 +1859,7 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
   current_node.parent_search_tree_location = T.begin();
   Q.insert(current_node);
 
-  if (PRINTING_DEBUG_DATA ) {
+  if (PRINTING_DEBUG_DATA) {
     std::cout << std::endl
               << "=============="
               << " Start node "
@@ -1868,14 +1868,13 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
     std::cout << std::endl;
     std::cout << start << std::endl;
   }
-  if (PRINTING_DEBUG_DATA ) {
+  if (PRINTING_DEBUG_DATA) {
     std::cout << std::endl
               << "=============="
               << " Finish node "
               << "==============" << std::endl;
     std::cout << finish << std::endl;
   }
-
 
   // Initialize temporary variables
   // flags
@@ -1998,7 +1997,8 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
         child_itr->print();
       }
 
-      // Check if child state has already been visited (by looking in search tree T)
+      // Check if child state has already been visited (by looking in search
+      // tree T)
 
       // for (std::list<Shortest_Path_Node>::iterator T_itr = T.begin();
       //      T_itr != T.end(); T_itr++) {
@@ -2040,13 +2040,21 @@ Polyline Environment::shortest_path(const Point &start, const Point &finish,
         // and then re-add it.
 
         // TODO: This can be a lambda.
-        for (std::set<Shortest_Path_Node>::iterator Q_itr = Q.begin();
-             Q_itr != Q.end(); Q_itr++) {
-          if (child_itr->vertex_index == Q_itr->vertex_index) {
-            Q.erase(Q_itr);
-            break;
-          }
-        }
+        // for (std::set<Shortest_Path_Node>::iterator Q_itr = Q.begin();
+        //      Q_itr != Q.end(); Q_itr++) {
+        //   if (child_itr->vertex_index == Q_itr->vertex_index) {
+        //     Q.erase(Q_itr);
+        //     break;
+        //   }
+        // }
+
+        auto existing_q_entry = std::find_if(
+            Q.begin(), Q.end(), [&child_itr](auto current) -> bool {
+              return child_itr->vertex_index == current.vertex_index;
+            });
+        if (existing_q_entry != Q.end())
+          Q.erase(existing_q_entry);
+
         Q.insert(*child_itr);
       }
 
@@ -3201,9 +3209,13 @@ std::ostream &operator<<(std::ostream &outs,
   return outs;
 }
 
-bool ShortestPathTest::validate(const VisiLibity::Environment &environment, const double epsilon, const VisiLibity::Guards &guards) {
+bool ShortestPathTest::validate(const VisiLibity::Environment &environment,
+                                const double epsilon,
+                                const VisiLibity::Guards &guards) {
 
-  const bool PRINTING_DEBUG_DATA = true;
+  // Set to true if you want debugging information printed during validation;
+  // set to false, otherwise.
+  const bool PRINTING_DEBUG_DATA = false;
 
   // ASCII escape sequences for colored terminal text.
   std::string alert("\a");       // Beep
@@ -3225,8 +3237,7 @@ bool ShortestPathTest::validate(const VisiLibity::Environment &environment, cons
   if (environment.is_valid(epsilon)) {
     if (PRINTING_DEBUG_DATA)
       std::cout << "OK" << std::endl;
-  }
-  else {
+  } else {
     std::cout << std::endl
               << red << "Warning:  Environment model "
               << "is invalid." << std::endl
@@ -3241,8 +3252,8 @@ bool ShortestPathTest::validate(const VisiLibity::Environment &environment, cons
     return false;
   }
 
-  // For the shortest path calculation tests, there must be two guards, the start
-  // guard and the finish guard.
+  // For the shortest path calculation tests, there must be two guards, the
+  // start guard and the finish guard.
   if (PRINTING_DEBUG_DATA)
     std::cout << "Checking that there are exactly two guards ... ";
 
@@ -3290,7 +3301,7 @@ bool ShortestPathTest::validate(const VisiLibity::Environment &environment, cons
               << "diameter " << environment.diameter() << "." << normal
               << std::endl;
 
-  // Guards data
+    // Guards data
     std::cout << "The guards' positions are:" << std::endl;
     std::cout << magenta << guards << normal;
 
