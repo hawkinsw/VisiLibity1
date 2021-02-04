@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Run all the shortest path tests in the sp_tests directory.
+#
+# A test requires three files:
+#  1. <name>.environment: The environment in which to find a shortest path
+#                         between two points.
+#  2. <name>.guards:      The location of 2 (two) points within in the 
+#                         environment and not in a hole.
+#  3. <name>.result:      The vertices of the shortest path between the points
+#                         defined in <name>.guards in the environment defined
+#                         in <name>.environment.
+#
+
 green_format='\033[0;32m'
 red_format='\033[0;31m'
 reset_format='\033[0m'
@@ -28,4 +40,5 @@ echo "Result:"
 echo -e "${green_format}Passing Tests: ${passing_tests}"
 echo -e "${red_format}Failing Tests: ${failing_tests}"
 echo -e "${reset_format}Total   Tests: ${total_tests}"
-exit 0
+
+exit ${failing_tests}
