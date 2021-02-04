@@ -2392,7 +2392,7 @@ bool Visibility_Polygon::is_spike(const Point &observer, const Point &point1,
             distance(observer, point2) >= distance(observer, point3)) or
            (distance(observer, point2) <= distance(observer, point1) and
             distance(observer, point2) <= distance(observer, point3)))
-      // and the pike is sufficiently sharp,
+      // and the spike is sufficiently sharp,
       and std::max(distance(Ray(observer, point1), point2),
                    distance(Ray(observer, point3), point2)) <= epsilon);
   // Formerly used
@@ -2482,8 +2482,8 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
   //[1] "Automated Camera Layout to Satisfy Task-Specific and
   // Floorplan-Specific Coverage Requirements" by Ugur Murat Erdem
   // and Stan Scarloff, April 15, 2004
-  // available at BUCS Technical Report Archive:
-  // http://www.cs.bu.edu/techreports/pdf/2004-015-camera-layout.pdf
+  // available at citeseer:
+  // http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.70.494&rep=rep1&type=pdf
   //
   //[2] "Art Gallery Theorems and Algorithms" by Joseph O'Rourke
   //
@@ -2514,7 +2514,7 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
 
   // true  => data printed to terminal
   // false => silent
-  const bool PRINTING_DEBUG_DATA = false;
+  const bool PRINTING_DEBUG_DATA = true;
 
   // The visibility polygon cannot have more vertices than the environment.
   vertices_.reserve(environment_temp.n());
@@ -2532,100 +2532,110 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
   // eliminated because they cannot possibly contribute to the
   // visibility polygon.
   std::list<Polar_Edge> elp;
-  Polar_Point ppoint1, ppoint2;
-  Polar_Point split_bottom, split_top;
-  double t;
+
   // If the observer is standing on the Enviroment boundary with its
   // back to the wall, these will be the bearings of the next vertex
   // to the right and to the left, respectively.
   Angle right_wall_bearing;
   Angle left_wall_bearing;
-  for (unsigned i = 0; i <= environment_temp.h(); i++) {
+  for (unsigned i = 0; i <= environment_temp.h();
+       i++) { // SNEAKY: Inclusive to be sure to consider 0 index, the outer
+              // boundary
+              // and the holes!
     for (unsigned j = 0; j < environment_temp[i].n(); j++) {
-      ppoint1 = Polar_Point(observer, environment_temp[i][j]);
-      ppoint2 = Polar_Point(observer, environment_temp[i][j + 1]);
+      // We are considering an edge vc (so named because it is in Cartesian
+      // coordinates) between the jth and (j+1)th points of the ith polygon
+      // (either the boundary or one of its holes).
+
+      // The polar points representing the start and end of vp, the
+      // polar-defined equivalent of vc.
+      Polar_Point edge_start = Polar_Point(observer, environment_temp[i][j]);
+      Polar_Point edge_end = Polar_Point(observer, environment_temp[i][j + 1]);
 
       // If the observer is in the relative interior of the edge.
-      if (observer.in_relative_interior_of(Line_Segment(ppoint1, ppoint2),
+      if (observer.in_relative_interior_of(Line_Segment(edge_start, edge_end),
                                            epsilon)) {
         // Split the edge at the observer and add the resulting two
         // edges to elp (the polar edge list).
-        split_bottom = Polar_Point(observer, observer);
-        split_top = Polar_Point(observer, observer);
+        Polar_Point split_point = Polar_Point(observer, observer);
 
-        if (ppoint2.bearing() == Angle(0.0))
-          ppoint2.set_bearing_to_2pi();
+        if (edge_end.bearing() == Angle(0.0))
+          edge_end.set_bearing_to_2pi();
 
-        left_wall_bearing = ppoint1.bearing();
-        right_wall_bearing = ppoint2.bearing();
+        left_wall_bearing = edge_start.bearing();
+        right_wall_bearing = edge_end.bearing();
 
-        elp.push_back(Polar_Edge(ppoint1, split_bottom));
-        elp.push_back(Polar_Edge(split_top, ppoint2));
+        elp.push_back(Polar_Edge(edge_start, split_point));
+        elp.push_back(Polar_Edge(split_point, edge_end));
         continue;
       }
 
       // Else if the observer is on first vertex of edge.
-      else if (distance(observer, ppoint1) <= epsilon) {
-        if (ppoint2.bearing() == Angle(0.0))
-          ppoint2.set_bearing_to_2pi();
+      else if (distance(observer, edge_start) <= epsilon) {
+        if (edge_end.bearing() == Angle(0.0))
+          edge_end.set_bearing_to_2pi();
         // Get right wall bearing.
-        right_wall_bearing = ppoint2.bearing();
-        elp.push_back(Polar_Edge(Polar_Point(observer, observer), ppoint2));
+        right_wall_bearing = edge_end.bearing();
+        elp.push_back(Polar_Edge(Polar_Point(observer, observer), edge_end));
         continue;
       }
       // Else if the observer is on second vertex of edge.
-      else if (distance(observer, ppoint2) <= epsilon) {
+      else if (distance(observer, edge_end) <= epsilon) {
         // Get left wall bearing.
-        left_wall_bearing = ppoint1.bearing();
-        elp.push_back(Polar_Edge(ppoint1, Polar_Point(observer, observer)));
+        left_wall_bearing = edge_start.bearing();
+        elp.push_back(Polar_Edge(edge_start, Polar_Point(observer, observer)));
         continue;
       }
 
       // Otherwise the observer is not on the edge.
 
       // If edge not horizontal (w/in epsilon).
-      else if (std::fabs(ppoint1.y() - ppoint2.y()) > epsilon) {
-        // Possible source of numerical instability?
-        t = (observer.y() - ppoint2.y()) / (ppoint1.y() - ppoint2.y());
-        // If edge crosses the ray emanating horizontal and right of
-        // the observer.
+      else if (std::fabs(edge_start.y() - edge_end.y()) > epsilon) {
+        // Line-line intersection definition from
+        // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection Possible
+        // source of numerical instability?
+        double t =
+            (observer.y() - edge_end.y()) / (edge_start.y() - edge_end.y());
+        // If the edge is not horizontal and does cross the ray
+        // emanating horizontal and right of the observer.
         if (0 < t and t < 1 and
-            observer.x() < t * ppoint1.x() + (1 - t) * ppoint2.x()) {
+            observer.x() < t * edge_start.x() + (1 - t) * edge_end.x()) {
           // If first point is above, omit edge because it runs
           //'against the grain'.
-          if (ppoint1.y() > observer.y())
+          if (edge_start.y() > observer.y())
             continue;
           // Otherwise split the edge, making sure angles are assigned
           // correctly on each side of the split point.
-          split_bottom = split_top = Polar_Point(
+          Polar_Point split_top = Polar_Point(
               observer,
-              Point(t * ppoint1.x() + (1 - t) * ppoint2.x(), observer.y()));
+              Point(t * edge_start.x() + (1 - t) * edge_end.x(), observer.y()));
+          Polar_Point split_bottom = split_top;
           split_top.set_bearing(Angle(0.0));
           split_bottom.set_bearing_to_2pi();
-          elp.push_back(Polar_Edge(ppoint1, split_bottom));
-          elp.push_back(Polar_Edge(split_top, ppoint2));
+          elp.push_back(Polar_Edge(edge_start, split_bottom));
+          elp.push_back(Polar_Edge(split_top, edge_end));
           continue;
         }
         // If the edge is not horizontal and doesn't cross the ray
         // emanating horizontal and right of the observer.
-        else if (ppoint1.bearing() >= ppoint2.bearing() and
-                 ppoint2.bearing() == Angle(0.0) and
-                 ppoint1.bearing() > Angle(M_PI))
-          ppoint2.set_bearing_to_2pi();
+        else if (edge_start.bearing() >= edge_end.bearing() and
+                 edge_end.bearing() == Angle(0.0) and
+                 edge_start.bearing() > Angle(M_PI))
+          edge_end.set_bearing_to_2pi();
         // Filter out edges which run 'against the grain'.
-        else if ((ppoint1.bearing() == Angle(0, 0) and
-                  ppoint2.bearing() > Angle(M_PI)) or
-                 ppoint1.bearing() >= ppoint2.bearing())
+        else if ((edge_start.bearing() == Angle(0, 0) and
+                  edge_end.bearing() > Angle(M_PI)) or
+                 edge_start.bearing() >= edge_end.bearing())
           continue;
-        elp.push_back(Polar_Edge(ppoint1, ppoint2));
+        elp.push_back(Polar_Edge(edge_start, edge_end));
         continue;
       }
       // If edge is horizontal (w/in epsilon).
       else {
         // Filter out edges which run 'against the grain'.
-        if (ppoint1.bearing() >= ppoint2.bearing())
+        if (edge_start.bearing() >= edge_end.bearing())
           continue;
-        elp.push_back(Polar_Edge(ppoint1, ppoint2));
+        elp.push_back(Polar_Edge(edge_start, edge_end));
       }
     }
   }
@@ -2643,10 +2653,11 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
   // the vertex which is the first point of its respective edge is
   // considered greater.  q1 will serve as an event point queue for
   // the radial sweep.
-  std::list<Polar_Point_With_Edge_Info> q1;
-  Polar_Point_With_Edge_Info ppoint_wei1, ppoint_wei2;
-  std::list<Polar_Edge>::iterator elp_iterator;
-  for (elp_iterator = elp.begin(); elp_iterator != elp.end(); elp_iterator++) {
+  std::list<Polar_Point_With_Edge_Info> event_point_q;
+
+  for (auto elp_iterator = elp.begin(); elp_iterator != elp.end();
+       elp_iterator++) {
+    Polar_Point_With_Edge_Info ppoint_wei1, ppoint_wei2;
     ppoint_wei1.set_polar_point(elp_iterator->first);
     ppoint_wei1.incident_edge = elp_iterator;
     ppoint_wei1.is_first = true;
@@ -2672,12 +2683,12 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
         (elp_iterator->second).set_bearing_to_2pi();
       }
     }
-    q1.push_back(ppoint_wei1);
-    q1.push_back(ppoint_wei2);
+    event_point_q.push_back(ppoint_wei1);
+    event_point_q.push_back(ppoint_wei2);
   }
-  // Put event point in correct order.
-  // STL list's sort method is a stable sort.
-  q1.sort();
+  // Put event point q in the correct order using Polar_Point_With_Edge_Info's
+  // less than operator. STL list's sort method is a stable sort.
+  event_point_q.sort();
 
   if (PRINTING_DEBUG_DATA) {
     std::cout << std::endl
@@ -2691,8 +2702,8 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
               << "\x1b[0m" << std::endl
               << std::endl
               << "q1 is" << std::endl;
-    std::list<Polar_Point_With_Edge_Info>::iterator q1_itr;
-    for (q1_itr = q1.begin(); q1_itr != q1.end(); q1_itr++) {
+    for (auto q1_itr = event_point_q.begin(); q1_itr != event_point_q.end();
+         q1_itr++) {
       std::cout << "[x  y  bearing  range is_first] = [" << q1_itr->x() << "  "
                 << q1_itr->y() << "  " << q1_itr->bearing() << "  "
                 << q1_itr->range() << "  " << q1_itr->is_first << "]"
@@ -2704,8 +2715,8 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
   //-------PREPARE FOR MAIN LOOP-------
   //
 
-  // current_vertex is used to hold the event point (from q1)
-  // considered at iteration of the main loop.
+  // current_vertex is used to hold the event point (from event_point_q)
+  // being considered at the current iteration of the main loop.
   Polar_Point_With_Edge_Info current_vertex;
   // Note active_edge and e are not actually edges themselves, but
   // iterators pointing to edges.  active_edge keeps track of the
@@ -2719,15 +2730,18 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
 
   // Priority queue of edges, where higher priority indicates closer
   // range to observer along current ray (of ray sweep).
+  // Named sl after the name it is given the the "Camera" article (SL, sorted
+  // list). The parameters are passed by reference and pointers to them are
+  // stored (SNEAKY)
   Incident_Edge_Compare my_iec(observer, current_vertex, epsilon);
   std::priority_queue<std::list<Polar_Edge>::iterator,
                       std::vector<std::list<Polar_Edge>::iterator>,
                       Incident_Edge_Compare>
-      q2(my_iec);
+      sl(my_iec);
 
   // Initialize main loop.
-  current_vertex = q1.front();
-  q1.pop_front();
+  current_vertex = event_point_q.front();
+  event_point_q.pop_front();
   active_edge = current_vertex.incident_edge;
 
   if (PRINTING_DEBUG_DATA) {
@@ -2745,17 +2759,17 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
     print_cv_and_ae(current_vertex, active_edge);
   }
 
-  // Insert e into q2 as long as it doesn't contain the
+  // Insert active_edge into sl as long as it doesn't contain the
   // observer.
   if (distance(observer, active_edge->first) > epsilon and
       distance(observer, active_edge->second) > epsilon) {
 
     if (PRINTING_DEBUG_DATA) {
       std::cout << std::endl
-                << "Push current_vertex's edge onto q2." << std::endl;
+                << "Push current_vertex's edge onto sl." << std::endl;
     }
 
-    q2.push(active_edge);
+    sl.push(active_edge);
   }
 
   if (PRINTING_DEBUG_DATA) {
@@ -2774,17 +2788,17 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
   //-------BEGIN MAIN LOOP-------//
   //
   // Perform radial sweep by sequentially considering each vertex
-  //(event point) in q1.
-  while (!q1.empty()) {
+  // (event point) in event_point_q.
+  while (!event_point_q.empty()) {
 
-    // Pop current_vertex from q1.
-    current_vertex = q1.front();
-    q1.pop_front();
+    // Pop current_vertex from event_point_q.
+    current_vertex = event_point_q.front();
+    event_point_q.pop_front();
 
     if (PRINTING_DEBUG_DATA) {
       std::cout << std::endl
                 << "\x1b[35m"
-                << "Pop next vertex off q1"
+                << "Pop next vertex off event_point_q"
                 << "\x1b[0m"
                 << " and set as current_vertex." << std::endl;
       print_cv_and_ae(current_vertex, active_edge);
@@ -2805,16 +2819,18 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
                   << std::endl;
       }
 
-      if (!q1.empty()) {
-        // If the next vertex in q1 is contiguous.
-        if (distance(current_vertex, q1.front()) <= epsilon) {
+      if (!event_point_q.empty()) {
+        // If the next vertex in event_point_q is contiguous.
+        if (distance(current_vertex, event_point_q.front()) <= epsilon) {
 
           if (PRINTING_DEBUG_DATA) {
             std::cout << std::endl
                       << "current_vertex is contiguous "
-                      << "with the next vertex in q1." << std::endl;
+                      << "with the next vertex in event_point_q." << std::endl;
           }
 
+          // This is an optimization. This case is better handled as a special
+          // case of Type 3.
           continue;
         }
       }
@@ -2830,12 +2846,12 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
       vertices_.push_back(current_vertex);
       chop_spikes_at_back(observer, epsilon);
 
-      while (!q2.empty()) {
-        e = q2.top();
+      while (!sl.empty()) {
+        e = sl.top();
 
         if (PRINTING_DEBUG_DATA) {
           std::cout << std::endl
-                    << "Examine edge at top of q2." << std::endl
+                    << "Examine edge at top of sl." << std::endl
                     << "1st point of e [x  y  bearing  range] = ["
                     << (e->first).x() << "  " << (e->first).y() << "  "
                     << (e->first).bearing() << "  " << (e->first).range() << "]"
@@ -2848,7 +2864,7 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
 
         // If the current_vertex bearing has not passed, in the
         // lex. order sense, the bearing of the second point of the
-        // edge at the front of q2.
+        // edge at the front of sl.
         if ((current_vertex.bearing().get() <= e->second.bearing().get())
             // For robustness.
             and distance(Ray(observer, current_vertex.bearing()), e->second) >=
@@ -2881,7 +2897,7 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
                       << "Add a type 1 k-point to visibility polygon."
                       << "\x1b[0m" << std::endl
                       << std::endl
-                      << "Set active_edge to edge at top of q2." << std::endl;
+                      << "Set active_edge to edge at top of sl." << std::endl;
           }
 
           // Push k onto the visibility polygon.
@@ -2889,13 +2905,14 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
           chop_spikes_at_back(observer, epsilon);
           active_edge = e;
           break;
-        }
+        } // else: the nearest incident edge is completely occluded by the
+          // active edge. Discard it and go to the next one.
 
         if (PRINTING_DEBUG_DATA) {
-          std::cout << std::endl << "Pop edge off top of q2." << std::endl;
+          std::cout << std::endl << "Pop edge off top of sl." << std::endl;
         }
 
-        q2.pop();
+        sl.pop();
       }
     } // Close Type 1.
 
@@ -2928,7 +2945,7 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
                   << std::endl;
       }
 
-      // Insert e into q2 as long as it doesn't contain the
+      // Insert e into sl as long as it doesn't contain the
       // observer.
       if (distance(observer, e->first) > epsilon and
           distance(observer, e->second) > epsilon) {
@@ -2938,13 +2955,13 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
                     << "Push current_vertex's edge onto q2." << std::endl;
         }
 
-        q2.push(e);
+        sl.push(e);
       }
 
       // TYPE 2: current_vertex is (1) a first vertex of some edge
       // other than active_edge, and (2) that edge should not become
       // the next active_edge.  This happens, e.g., if that edge is
-      //(rangewise) in back along the current bearing.
+      // (rangewise) in back along the current bearing.
       if (k_range < current_vertex.range()) {
 
         if (PRINTING_DEBUG_DATA) {
@@ -2965,7 +2982,7 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
       // TYPE 3: current_vertex is (1) the first vertex of some edge
       // other than active_edge, and (2) that edge should become the
       // next active_edge.  This happens, e.g., if that edge is
-      //(rangewise) in front along the current bearing.
+      // (rangewise) in front along the current bearing.
       if (k_range >= current_vertex.range()) {
 
         if (PRINTING_DEBUG_DATA) {
@@ -3026,8 +3043,7 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
                 << Polygon(vertices_) << std::endl
                 << std::endl;
     }
-  } //
-    //
+  }
   //-------END MAIN LOOP-------//
 
   // The Visibility_Polygon should have a minimal representation
@@ -3045,9 +3061,8 @@ Visibility_Polygon::Visibility_Polygon(const Point &observer,
 }
 Visibility_Polygon::Visibility_Polygon(const Point &observer,
                                        const Polygon &polygon_temp,
-                                       double epsilon) {
-  *this = Visibility_Polygon(observer, Environment(polygon_temp), epsilon);
-}
+                                       double epsilon)
+    : Visibility_Polygon(observer, Environment(polygon_temp), epsilon) {}
 
 // Visibility_Graph
 
@@ -3130,9 +3145,8 @@ Visibility_Graph::Visibility_Graph(const std::vector<Point> points,
 
 Visibility_Graph::Visibility_Graph(const Guards &guards,
                                    const Environment &environment,
-                                   double epsilon) {
-  *this = Visibility_Graph(guards.positions_, environment, epsilon);
-}
+                                   double epsilon)
+    : Visibility_Graph(guards.positions_, environment, epsilon) {}
 
 bool Visibility_Graph::operator()(unsigned i1, unsigned j1, unsigned i2,
                                   unsigned j2) const {

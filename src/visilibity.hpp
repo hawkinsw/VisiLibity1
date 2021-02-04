@@ -1825,7 +1825,7 @@ private:
     }
     // The operator < is the same as for Polar_Point with one
     // exception.  If two vertices have equal coordinates, but one is
-    // the first point of its respecitve edge and the other is the
+    // the first point of its respective edge and the other is the
     // second point of its respective edge, then the vertex which is
     // the second point of its respective edge is considered
     // lexicographically smaller.
